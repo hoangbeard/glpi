@@ -1,0 +1,80 @@
+services:
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: glpi:nginx
+    container_name: glpi-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - php
+    volumes:
+      - ./glpi:/var/www/glpi
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    networks:
+      - phpweb
+
+  php:
+    build:
+      context: ./php-fpm
+      dockerfile: Dockerfile
+    image: glpi:fpm
+    container_name: glpi-fpm
+    expose:
+      - 9000
+    volumes:
+      - ./glpi:/var/www/glpi
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:9000"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    networks:
+      - phpweb
+
+  db:
+    image: mysql:lts
+    container_name: glpi-db
+    environment:
+      MYSQL_ROOT_PASSWORD: mysqlrootpass
+      MYSQL_DATABASE: glpi
+      MYSQL_USER: glpi
+      MYSQL_PASSWORD: glpipass
+    expose:
+      - 3306
+    ports:
+      - "6033:3306"
+    volumes:
+      - ./dbdata:/var/lib/mysql
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - phpweb
+
+networks:
+  phpweb:
+
+# volumes:
+#   dbdata:
+#   glpi:
