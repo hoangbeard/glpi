@@ -4,6 +4,7 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     image: glpi:nginx
+    hostname: web
     container_name: glpi-nginx
     ports:
       - "80:80"
@@ -12,51 +13,37 @@ services:
     volumes:
       - ./glpi:/var/www/glpi
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
+    user: root
     networks:
-      - phpweb
+      - glpinet
 
   php:
     build:
       context: ./php-fpm
       dockerfile: Dockerfile
     image: glpi:fpm
+    hostname: glpi
     container_name: glpi-fpm
     expose:
       - 9000
+    depends_on:
+      - db
     volumes:
       - ./glpi:/var/www/glpi
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:9000"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
+    user: root
     networks:
-      - phpweb
+      - glpinet
 
   db:
     image: mysql:lts
+    hostname: mysql
     container_name: glpi-db
     environment:
-      MYSQL_ROOT_PASSWORD: mysqlrootpass
-      MYSQL_DATABASE: glpi
-      MYSQL_USER: glpi
-      MYSQL_PASSWORD: glpipass
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     expose:
       - 3306
     ports:
@@ -64,17 +51,9 @@ services:
     volumes:
       - ./dbdata:/var/lib/mysql
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    user: root
     networks:
-      - phpweb
+      - glpinet
 
 networks:
-  phpweb:
-
-# volumes:
-#   dbdata:
-#   glpi:
+  glpinet:
