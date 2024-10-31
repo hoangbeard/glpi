@@ -18,7 +18,7 @@ COPY config/nginx_web.conf /etc/nginx/conf.d/default.conf
 
 # Copy source
 WORKDIR /var/www/glpi
-COPY --chown=nginx:nginx glpi/ ./
+COPY --chown=www-data:www-data glpi/ ./
 
 # Set correct permissions and remove unnecessary files
 RUN chmod 2775 /var/www/glpi && \
@@ -28,5 +28,5 @@ RUN chmod 2775 /var/www/glpi && \
 # Expose port 80 for HTTP
 EXPOSE 80
 
-# Start Nginx
+# Set default command to run Nginx in foreground mode
 CMD ["nginx", "-g", "daemon off;"]

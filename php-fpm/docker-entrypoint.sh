@@ -2,42 +2,100 @@
 
 set -e
 
+# Wait for MySQL to be ready
+wait_for_mysql() {
+    echo "Waiting for MySQL to be ready..."
+    while ! nc -z db 3306; do
+        sleep 1
+    done
+    echo "MySQL is ready."
+}
+
+# Call the wait function
+wait_for_mysql
+
 # Check system requirements
-# echo "Checking system requirements..."
-# php bin/console glpi:system:check_requirements --no-interaction
+echo "==============================="
+echo "Checking system requirements..."
+echo "==============================="
+php bin/console glpi:system:check_requirements --no-interaction -vv
+echo "Check system requirements done."
 
-# Set necessary permissions
-echo "Setting necessary permissions..."
-chmod 777 -R /var/www/glpi/config
-chmod 777 -R /var/www/glpi/files
-chmod 777 -R /var/www/glpi/marketplace
+# Check if GLPI is already installed
+if [ ! -f /var/www/glpi/config/config_db.php ]; then
+    # GLPI is not installed, run installation
+    echo "==========================="
+    echo "Installing GLPI database..."
+    echo "==========================="
+    php bin/console db:install -vv \
+        --db-host=db \
+        --db-port=3306 \
+        --db-user=glpi \
+        --db-password=glpipass \
+        --db-name=glpi \
+        --no-interaction \
+        --force
+        
+    echo "Install GLPI database done."
 
-# Install GLPI database
-echo "Installing GLPI database..."
-php bin/console db:install \
-    --db-host=db \
-    --db-port=3306 \
-    --db-user=glpi \
-    --db-password=glpipass \
-    --db-name=glpi \
-    --reconfigure \
-    --no-interaction
+    # Check database schema integrity
+    echo "====================================="
+    echo "Checking database schema integrity..."
+    echo "====================================="
+    php bin/console db:check_schema_integrity --no-interaction -vv
+    echo "Check database schema integrity done."
+else
+    echo "GLPI is already installed."
+    echo "======================================="
+    echo "Updating GLPI database configuration..."
+    echo "======================================="
+    php bin/console db:configure -vv \
+        --db-host=db \
+        --db-port=3306 \
+        --db-user=glpi \
+        --db-password=glpipass \
+        --db-name=glpi \
+        --no-interaction \
+        --reconfigure
+    
+    echo "GLPI database configuration updated."
+fi
 
-# Database schema check
-# echo "Checking database schema integrity..."
-# php bin/console db:check_schema_integrity --no-interaction
+# Access to timezone database
+echo "==========================="
+echo "Enabling timezones support..."
+echo "==========================="
+php bin/console db:enable_timezones --no-interaction -vv
+echo "Enable timezones support done."
 
 # Plugins installation
+echo "=========================="
 echo "Installing GLPI plugins..."
-php bin/console glpi:plugin:install --all --no-interaction
-php bin/console glpi:plugin:activate --all --no-interaction
+echo "=========================="
+php bin/console glpi:plugin:install --all --username=glpi --force
+php bin/console glpi:plugin:activate --all
+echo "Install GLPI plugins done."
 
-# Rollback permissions
-echo "Rolling back permissions..."
-chmod 775 -R /var/www/glpi/config
-chmod 775 -R /var/www/glpi/files
-chmod 775 -R /var/www/glpi/marketplace
+# System status
+echo "=============================="
+echo "Checking GLPI system status..."
+echo "=============================="
+php bin/console glpi:system:status --format=json
+echo "Check GLPI system status done."
 
+# Remove install/ directory
+# if [ -e /var/www/glpi/install ]; then
+#     echo "=============================="
+#     echo "Removing install/ directory..."
+#     echo "=============================="
+#     rm -rf /var/www/glpi/install
+#     echo "Removed install/ directory."
+# else
+#     echo "install/ directory does not exist."
+# fi
+
+echo "==========================="
 echo "GLPI installation complete."
+echo "==========================="
 
 exec "$@"

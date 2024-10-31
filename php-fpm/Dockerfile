@@ -6,6 +6,7 @@ LABEL author="HoangBeard - <github.com/hoangbeard>" \
 
 # Install Nginx and other dependencies
 RUN apt-get update && apt-get install -y \
+    netcat-openbsd \
     libbz2-dev \
     libc-dev \
     libkrb5-dev \
@@ -59,5 +60,5 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 # Expose port 9000 for PHP-FPM
 EXPOSE 9000
 
-# Start php-fpm
+# Set default command to run PHP-FPM in foreground mode
 CMD ["php-fpm", "-F"]

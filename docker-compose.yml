@@ -9,11 +9,16 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - php
+      php:
+        condition: service_healthy
     volumes:
-      - ./glpi:/var/www/glpi
+      - glpi:/var/www/glpi
     restart: unless-stopped
-    user: root
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
     networks:
       - glpinet
 
@@ -27,13 +32,18 @@ services:
     expose:
       - 9000
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
-      - ./glpi:/var/www/glpi
+      - glpi:/var/www/glpi
     restart: unless-stopped
-    user: root
     networks:
       - glpinet
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
   db:
     image: mysql:lts
@@ -49,11 +59,20 @@ services:
     ports:
       - "6033:3306"
     volumes:
-      - ./dbdata:/var/lib/mysql
+      - dbdata:/var/lib/mysql
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql
     restart: unless-stopped
-    user: root
     networks:
       - glpinet
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   glpinet:
+
+volumes:
+  dbdata:
+  glpi:
