@@ -29,6 +29,14 @@ services:
     image: glpi:fpm
     hostname: glpi
     container_name: glpi-fpm
+    environment:
+      - GLPI_DB_HOST=${GLPI_DB_HOST}
+      - GLPI_DB_PORT=${GLPI_DB_PORT}
+      - GLPI_DB_DATABASE=${GLPI_DB_DATABASE}
+      - GLPI_DB_USER=${GLPI_DB_USER}
+      - GLPI_DB_PASSWORD=${GLPI_DB_PASSWORD}
+      - GLPI_LANGUAGE=${GLPI_LANGUAGE}
+      - GLPI_ADMIN_USER=${GLPI_ADMIN_USER}
     expose:
       - 9000
     depends_on:
@@ -51,9 +59,9 @@ services:
     container_name: glpi-db
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${GLPI_DB_DATABASE}
+      - MYSQL_USER=${GLPI_DB_USER}
+      - MYSQL_PASSWORD=${GLPI_DB_PASSWORD}
     expose:
       - 3306
     ports:

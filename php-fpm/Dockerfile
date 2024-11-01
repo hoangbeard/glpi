@@ -4,7 +4,7 @@ FROM php:8.2-fpm
 LABEL author="HoangBeard - <github.com/hoangbeard>" \
     description="PHP-FPM image for web applications"
 
-# Install Nginx and other dependencies
+# Install necessary dependencies
 RUN apt-get update && apt-get install -y \
     netcat-openbsd \
     libbz2-dev \
