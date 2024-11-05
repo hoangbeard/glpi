@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y \
 COPY config/nginx.conf /etc/nginx/nginx.conf
 COPY config/nginx_web.conf /etc/nginx/conf.d/default.conf
 
+# Copy the docker-entrypoint.sh script to the root directory
+COPY docker-entrypoint.sh /
+
 # Copy source
 WORKDIR /var/www/glpi
 COPY --chown=www-data:www-data glpi/ ./
@@ -24,6 +27,9 @@ COPY --chown=www-data:www-data glpi/ ./
 RUN chmod 2775 /var/www/glpi && \
     find /var/www/glpi -type d -exec chmod 2775 {} \; && \
     find /var/www/glpi -type f -exec chmod 0664 {} \;
+
+# Set the entrypoint for the container to be the docker-entrypoint.sh script
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Expose port 80 for HTTP
 EXPOSE 80

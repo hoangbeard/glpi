@@ -6,6 +6,8 @@ services:
     image: hoangbeard/glpi:nginx
     hostname: web
     container_name: glpi-nginx
+    environment:
+      - FASTCGI_PASS=${FASTCGI_PASS}
     ports:
       - "80:80"
     depends_on:

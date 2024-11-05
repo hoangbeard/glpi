@@ -110,4 +110,5 @@ echo "==========================="
 echo "GLPI installation complete."
 echo "==========================="
 
+# Execute the main container command
 exec "$@"

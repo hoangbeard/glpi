@@ -82,14 +82,6 @@ deploy_files() {
 build_docker_image() {
     local service=$1
 
-    # Main execution
-    init_directories
-    load_env
-    download_glpi
-    download_plugin
-    extract_files
-    deploy_files
-
     echo "Building ${service} docker image..."
     docker buildx build \
         --tag ${GIT_REPO_URL}:${service} \
@@ -101,9 +93,6 @@ build_docker_image() {
 push_docker_image() {
     local service=$1
 
-    # Main execution
-    load_env
-
     echo "Pushing ${service} docker image..."
     docker push ${GIT_REPO_URL}:${service}
     echo "Pushing ${service} docker image done!"
@@ -112,11 +101,20 @@ push_docker_image() {
 # Process command line argument
 case $1 in
     'build')
+        # Main execution
+        init_directories
+        load_env
+        download_glpi
+        download_plugin
+        extract_files
+        deploy_files
         build_docker_image "nginx"
         build_docker_image "php-fpm"
         ;;
 
     'push')
+        # Main execution
+        load_env
         push_docker_image "nginx"
         push_docker_image "php-fpm"
         ;;

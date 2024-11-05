@@ -1,6 +1,6 @@
 [
   {
-    "name": "glpi-nginx",
+    "name": "${web_server_container_name}",
     "image": "${web_server_image}",
     "essential": true,
     "portMappings": [
@@ -25,7 +25,10 @@
       }
     },
     "healthCheck": {
-      "command": ["CMD-SHELL", "curl -f http://localhost || exit 1"],
+      "command": [
+        "CMD-SHELL",
+        "curl -f http://localhost || exit 1"
+      ],
       "interval": 30,
       "timeout": 5,
       "retries": 3,
@@ -33,7 +36,7 @@
     }
   },
   {
-    "name": "glpi-php-fpm",
+    "name": "${php_fpm_container_name}",
     "image": "${php_fpm_image}",
     "essential": true,
     "portMappings": [
@@ -58,7 +61,10 @@
       }
     },
     "healthCheck": {
-      "command": ["CMD-SHELL", "php-fpm -t || exit 1"],
+      "command": [
+        "CMD-SHELL",
+        "php-fpm -t || exit 1"
+      ],
       "interval": 30,
       "timeout": 5,
       "retries": 3,
