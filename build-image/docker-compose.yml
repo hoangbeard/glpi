@@ -3,7 +3,7 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
-    image: hoangbeard/glpi:nginx
+    image: ${GIT_REPO_URL}:nginx
     hostname: web
     container_name: glpi-nginx
     environment:
@@ -28,7 +28,7 @@ services:
     build:
       context: ./php-fpm
       dockerfile: Dockerfile
-    image: hoangbeard/glpi:php-fpm
+    image: ${GIT_REPO_URL}:php-fpm
     hostname: glpi
     container_name: glpi-fpm
     environment:

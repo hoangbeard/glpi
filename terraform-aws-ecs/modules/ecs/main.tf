@@ -213,7 +213,7 @@ resource "aws_ecs_task_definition" "this" {
       environment = [
         {
           name  = "GLPI_DB_HOST"
-          value = "rds-endpoint"
+          value = var.db_instance_endpoint
         },
         {
           name  = "GLPI_DB_PORT"

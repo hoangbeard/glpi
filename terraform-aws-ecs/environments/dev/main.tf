@@ -92,6 +92,7 @@ module "ecs" {
   retention_in_days      = 90
   efs_file_system_id     = module.storage.efs_file_system_id
   efs_access_point_id    = module.storage.efs_access_point_id
+  db_instance_endpoint   = module.storage.db_instance_endpoint
 }
 
 # ========================================================

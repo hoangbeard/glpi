@@ -103,7 +103,7 @@ chown -R www-data:www-data /var/www/glpi/files
 chmod 2775 /var/www/glpi/files
 find /var/www/glpi/files -type d -exec chmod 2775 {} \;
 find /var/www/glpi/files -type f -exec chmod 0664 {} \;
-echo "Permissions set."
+echo "Set permissions done."
 
 echo ""
 echo "==========================="

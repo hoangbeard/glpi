@@ -84,3 +84,8 @@ variable "efs_access_point_id" {
   description = "ID of the EFS access point"
   type        = string
 }
+
+variable "db_instance_endpoint" {
+  description = "The DB instance Endpoint URL"
+  type        = string
+}

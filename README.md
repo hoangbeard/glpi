@@ -9,10 +9,41 @@ This is a Docker image for [GLPI](https://glpi-project.org/).
 
 ## Usage
 
+### Run testing
+
 1. Clone this repository
-2. Copy `.env.sample` to `.env` and edit the variables
-3. Run `bootstrap.sh`
-4. Open your browser and go to `http://localhost`
+
+    ```bash
+    git clone https://github.com/hoangbeard/glpi
+    ```
+
+2. Run following script to start docker compose
+
+    ```bash
+    cd glpi/build-image
+    chmod +x bootstrap.sh
+    ./bootstrap.sh compose
+    ```
+
+3. Open your browser and go to `http://localhost`
+
+### Run build and push
+
+1. Clone this repository
+
+    ```bash
+    git clone https://github.com/hoangbeard/glpi
+    ```
+
+2. Run following script to start docker compose
+
+    ```bash
+    cd glpi/build-image
+    chmod +x bootstrap.sh
+    ./bootstrap.sh build-push
+    ```
+
+    ***Notice: Check the contents of the .env file before running the script.***
 
 ## License
 
