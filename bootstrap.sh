@@ -78,6 +78,14 @@ deploy_files() {
     echo "Deployment complete."
 }
 
+# Function to authenticate Docker to AWS ECR
+authenticate_docker() {
+    local ecr_repository=$1
+
+    echo "Authenticating using environment variables"
+    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ecr_repository
+}
+
 # Function to build docker images
 build_docker_image() {
     local service=$1
@@ -122,6 +130,7 @@ case $1 in
     'build-push')
         build_docker_image "nginx"
         build_docker_image "php-fpm"
+        authenticate_docker $GIT_REPO_URL
         push_docker_image "nginx"
         push_docker_image "php-fpm"
         ;;
