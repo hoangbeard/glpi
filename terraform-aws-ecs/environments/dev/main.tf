@@ -8,6 +8,12 @@ provider "aws" {
   }
 }
 
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+data "aws_vpc" "selected" {
+  id = local.vpc_id
+}
+
 locals {
   environment            = "dev"
   app_name               = "glpi"
@@ -16,34 +22,27 @@ locals {
   container_port         = 80
   php_fpm_container_name = "${local.environment}-${local.app_name}-php-fpm"
 
-  vpc_id = "vpc-08dac23aabbc5b1499"
+  vpc_id = "vpc-08dac23aabbc5b149"
   public_subnet_ids = [
-    "subnet-084f5c8356b084af19",
-    "subnet-02b1c001ba8499b039"
+    "subnet-084f5c8356b084af1",
+    "subnet-02b1c001ba8499b03"
   ]
   private_subnet_ids = [
-    "subnet-0eaa01a119bb15d959",
-    "subnet-0817a8ae1b319d8619"
+    "subnet-0eaa01a119bb15d95",
+    "subnet-0817a8ae1b319d861"
   ]
 
   db_subnet_group_name = "operation-database-subnets-group"
 
   access_point_path   = "/${local.app_name}-data"
-  s3_logs_bucket_name = "centralized-ops-logs-bucket"
-  certificate_arn     = "arn:aws:acm:ap-southeast-1:6408538365439:certificate/a944d470-4bc1-4221-bf38-e66f9d6f8d6a"
+  s3_logs_bucket_name = "movi-ops-logs-bucket"
+  certificate_arn     = "arn:aws:acm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:certificate/a944d470-4bc1-4221-bf38-e66f9d6f8d6a"
 
   tags = {
     AppName     = "GLPI"
     Environment = "Development"
     Owner       = "CloudOpsTeam"
   }
-}
-
-data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
-
-data "aws_vpc" "selected" {
-  id = local.vpc_id
 }
 
 # ========================================================
@@ -74,9 +73,11 @@ module "alb" {
 module "ecs" {
   source = "../../modules/ecs"
 
-  tags        = local.tags
-  app_name    = local.app_name
-  environment = local.environment
+  tags           = local.tags
+  app_name       = local.app_name
+  environment    = local.environment
+  region         = data.aws_region.current.name
+  vpc_cidr_block = data.aws_vpc.selected.cidr_block
 
   # ECS
   cluster_name           = local.cluster_name
@@ -87,12 +88,15 @@ module "ecs" {
   container_port         = local.container_port
   desired_count          = 1
   php_fpm_container_name = local.php_fpm_container_name
-  ecr_repository_url     = module.storage.ecr_repository_url
-  kms_key_id             = module.storage.kms_key_id
-  retention_in_days      = 90
-  efs_file_system_id     = module.storage.efs_file_system_id
-  efs_access_point_id    = module.storage.efs_access_point_id
-  db_instance_endpoint   = module.storage.db_instance_endpoint
+  nginx_image_name       = "${local.app_name}-nginx"
+  php_fpm_image_name     = "${local.app_name}-php-fpm"
+
+  kms_key_id        = module.storage.kms_key_id
+  retention_in_days = 90
+
+  efs_file_system_id  = module.storage.efs_file_system_id
+  efs_access_point_id = module.storage.efs_access_point_id
+  db_instance_address = module.storage.db_instance_address
 }
 
 # ========================================================
@@ -102,13 +106,15 @@ module "ecs" {
 module "storage" {
   source = "../../modules/storage"
 
-  tags = local.tags
+  tags           = local.tags
+  aws_account_id = data.aws_caller_identity.current.account_id
 
   # ECS
-  cluster_name = local.cluster_name
-  service_name = local.service_name
-  vpc_id       = local.vpc_id
-  subnets      = local.private_subnet_ids
+  cluster_name   = local.cluster_name
+  service_name   = local.service_name
+  vpc_id         = local.vpc_id
+  subnets        = local.private_subnet_ids
+  vpc_cidr_block = data.aws_vpc.selected.cidr_block
 
   # RDS
   db_instance_name     = "${local.environment}-${local.app_name}-db"

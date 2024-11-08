@@ -5,7 +5,7 @@ set -e
 # Wait for MySQL to be ready
 wait_for_mysql() {
     echo "Waiting for MySQL to be ready..."
-    while ! nc -z db $GLPI_DB_PORT; do
+    while ! nc -z ${GLPI_DB_HOST} ${GLPI_DB_PORT}; do
         sleep 1
     done
     echo "MySQL is ready."

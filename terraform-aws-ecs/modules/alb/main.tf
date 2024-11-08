@@ -4,12 +4,12 @@
 
 resource "aws_lb" "this" {
   name               = var.alb_name
-  internal           = false
+  internal           = var.internal
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = var.subnets
 
-  enable_deletion_protection = false
+  enable_deletion_protection = var.enable_deletion_protection
 
   access_logs {
     bucket  = var.s3_logs_bucket_name
@@ -56,7 +56,7 @@ resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.this.arn
   port              = "443"
   protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  ssl_policy        = var.ssl_policy
   certificate_arn   = var.certificate_arn
 
   default_action {

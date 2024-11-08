@@ -4,6 +4,23 @@ variable "tags" {
   default     = {}
 }
 
+variable "environment" {
+  description = "The environment name"
+  type        = string
+  default     = "dev"
+}
+
+variable "app_name" {
+  description = "Name of the application"
+  type        = string
+  default     = "glpi"
+}
+
+variable "aws_account_id" {
+  description = "AWS Account ID"
+  type        = string
+}
+
 # ========================================================
 # RDS Variables
 # ========================================================
@@ -38,9 +55,19 @@ variable "service_name" {
   type        = string
 }
 
+# ========================================================
+# VPC Variables
+# ========================================================
+
 variable "vpc_id" {
   description = "ID of the VPC"
   type        = string
+}
+
+variable "vpc_cidr_block" {
+  description = "CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
 }
 
 variable "subnets" {

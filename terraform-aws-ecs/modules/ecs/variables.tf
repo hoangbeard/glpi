@@ -16,6 +16,16 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-southeast-1"
+}
+
+# ========================================================
+# ECS Variables
+# ========================================================
+
 variable "cluster_name" {
   description = "Name of the ECS cluster"
   type        = string
@@ -26,9 +36,10 @@ variable "service_name" {
   type        = string
 }
 
-variable "target_group_arn" {
-  description = "ARN of the target group for the service"
-  type        = string
+variable "desired_count" {
+  description = "Number of tasks to run in the service"
+  type        = number
+  default     = 1
 }
 
 variable "container_port" {
@@ -37,15 +48,25 @@ variable "container_port" {
   default     = 80
 }
 
-variable "desired_count" {
-  description = "Number of tasks to run in the service"
-  type        = number
-  default     = 1
+variable "php_fpm_container_name" {
+  description = "Name of the PHP-FPM container"
+  type        = string
+  default     = "php-fpm"
 }
+
+# ========================================================
+# VPC Variables
+# ========================================================
 
 variable "vpc_id" {
   description = "ID of the VPC where the service will be deployed"
   type        = string
+}
+
+variable "vpc_cidr_block" {
+  description = "CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
 }
 
 variable "subnets" {
@@ -53,27 +74,53 @@ variable "subnets" {
   type        = list(string)
 }
 
-variable "php_fpm_container_name" {
-  description = "Name of the PHP-FPM container"
+# ========================================================
+# ALB Variables
+# ========================================================
+
+variable "target_group_arn" {
+  description = "ARN of the target group for the service"
   type        = string
-  default     = "php-fpm"
 }
 
-variable "ecr_repository_url" {
-  description = "URL of the ECR repository containing the Docker image"
+# ========================================================
+# ECR Variables
+# ========================================================
+
+variable "nginx_image_name" {
+  description = "The name of ECR repository containing the Nginx image"
   type        = string
+  default     = "glpi-nginx"
 }
+
+variable "php_fpm_image_name" {
+  description = "The name of ECR repository containing the PHP-FPM image"
+  type        = string
+  default     = "glpi-php-fpm"
+}
+
+# ========================================================
+# KMS Variables
+# ========================================================
 
 variable "kms_key_id" {
   description = "ID of the KMS key for data encryption"
   type        = string
 }
 
+# ========================================================
+# CloudWatch Log Group Variables
+# ========================================================
+
 variable "retention_in_days" {
   description = "Number of days to retain logs in CloudWatch"
   type        = number
   default     = 30
 }
+
+# ========================================================
+# EFS Variables
+# ========================================================
 
 variable "efs_file_system_id" {
   description = "ID of the EFS file system"
@@ -85,7 +132,11 @@ variable "efs_access_point_id" {
   type        = string
 }
 
-variable "db_instance_endpoint" {
+# ========================================================
+# RDS Variables
+# ========================================================
+
+variable "db_instance_address" {
   description = "The DB instance Endpoint URL"
   type        = string
 }

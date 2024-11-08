@@ -4,7 +4,10 @@
 
 output "ecr_repository_url" {
   description = "The URL of the ECR repository"
-  value       = aws_ecr_repository.this.repository_url
+  value = {
+    for repo in aws_ecr_repository.this :
+    repo.name => repo.repository_url
+  }
 }
 
 # ========================================================
@@ -12,14 +15,29 @@ output "ecr_repository_url" {
 # ========================================================
 
 output "db_instance_endpoint" {
-  description = "The endpoint of the RDS instance"
+  description = "The endpoint 'address:port' of the RDS instance"
   value       = aws_db_instance.this.endpoint
+}
+
+output "db_instance_address" {
+  description = "The address of the RDS instance"
+  value       = aws_db_instance.this.address
 }
 
 output "db_engine_version_actual" {
   description = "The running version of the database"
   value       = aws_db_instance.this.engine_version_actual
 }
+
+output "db_master_username" {
+  description = "The master username for the database"
+  value       = aws_db_instance.this.username
+}
+
+# output "db_name" {
+#   description = "The name of the initial database"
+#   value       = aws_db_instance.this.db_name
+# }
 
 # ========================================================
 # EFS Outputs

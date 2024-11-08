@@ -1,11 +1,7 @@
-data "aws_region" "current" {}
-data "aws_vpc" "selected" {
-  id = var.vpc_id
-}
-
 # ========================================================
 # ECS Cluster
 # ========================================================
+
 resource "aws_ecs_cluster" "this" {
   name = var.cluster_name
 
@@ -20,7 +16,7 @@ resource "aws_ecs_cluster" "this" {
       logging    = "OVERRIDE"
 
       log_configuration {
-        cloud_watch_encryption_enabled = true
+        cloud_watch_encryption_enabled = false
         cloud_watch_log_group_name     = aws_cloudwatch_log_group.this.name
       }
     }
@@ -49,17 +45,21 @@ resource "aws_cloudwatch_log_group" "this" {
   name              = "${var.service_name}-cwlg"
   retention_in_days = var.retention_in_days
   skip_destroy      = false
-  tags              = var.tags
+  # kms_key_id        = var.kms_key_id
+  tags = var.tags
 }
 
 # ========================================================
 # ECS Service
 # ========================================================
 resource "aws_ecs_service" "this" {
-  name            = var.service_name
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.this.arn
-  desired_count   = var.desired_count
+  name                              = var.service_name
+  cluster                           = aws_ecs_cluster.this.id
+  task_definition                   = aws_ecs_task_definition.this.arn
+  desired_count                     = var.desired_count
+  enable_execute_command            = true
+  force_new_deployment              = true
+  health_check_grace_period_seconds = 120
   # launch_type     = "FARGATE"
 
   capacity_provider_strategy {
@@ -78,6 +78,18 @@ resource "aws_ecs_service" "this" {
     container_name   = var.service_name
     container_port   = var.container_port
   }
+
+  deployment_controller {
+    type = "ECS"
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  deployment_maximum_percent         = 200
+  deployment_minimum_healthy_percent = 100
 }
 
 # ========================================================
@@ -115,14 +127,50 @@ resource "aws_service_discovery_service" "this" {
 # ========================================================
 # ECS Task Definitions
 # ========================================================
+
+data "aws_ecr_repository" "nginx" {
+  name = var.nginx_image_name
+}
+
+data "aws_ecr_repository" "php_fpm" {
+  name = var.php_fpm_image_name
+}
+
+data "aws_ecs_task_definition" "this" {
+  task_definition = aws_ecs_task_definition.this.family
+
+  depends_on = [
+    # Needs to exist first on first deployment
+    aws_ecs_task_definition.this
+  ]
+}
+
+locals {
+  # This allows us to query both the existing as well as Terraform's state and get
+  # and get the max version of either source, useful for when external resources
+  # update the container definition
+  max_task_def_revision = max(aws_ecs_task_definition.this.revision, data.aws_ecs_task_definition.this.revision)
+
+  # GLPI Nginx image
+  nginx_ecr_version = [for tag in data.aws_ecr_repository.nginx.most_recent_image_tags : tag if tag != "latest"][0]
+  nginx_image       = "${data.aws_ecr_repository.nginx.repository_url}:${local.nginx_ecr_version}"
+  # nginx_ecr_version = data.aws_ecr_repository.nginx.most_recent_image_tags[0] == "latest" && length(data.aws_ecr_repository.nginx.most_recent_image_tags) > 1 ? data.aws_ecr_repository.nginx.most_recent_image_tags[1] : data.aws_ecr_repository.nginx.most_recent_image_tags[0]
+
+  # GLPI PHP-FPM image
+  php_fpm_ecr_version = [for tag in data.aws_ecr_repository.php_fpm.most_recent_image_tags : tag if tag != "latest"][0]
+  php_fpm_image       = "${data.aws_ecr_repository.php_fpm.repository_url}:${local.php_fpm_ecr_version}"
+  # php_fpm_ecr_version = data.aws_ecr_repository.php_fpm.most_recent_image_tags[0] == "latest" && length(data.aws_ecr_repository.php_fpm.most_recent_image_tags) > 1 ? data.aws_ecr_repository.php_fpm.most_recent_image_tags[1] : data.aws_ecr_repository.php_fpm.most_recent_image_tags[0]
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = "${var.service_name}-taskdef"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = 512
-  memory                   = 1024
+  cpu                      = 1024
+  memory                   = 2048
   execution_role_arn       = aws_iam_role.ecs_task_exec_role.arn
   task_role_arn            = aws_iam_role.ecs_task_role.arn
+  skip_destroy             = true
 
   volume {
     name = "${var.service_name}-efs-volume"
@@ -141,10 +189,11 @@ resource "aws_ecs_task_definition" "this" {
 
   container_definitions = jsonencode([
     {
-      name      = var.service_name
-      image     = "${var.ecr_repository_url}:nginx"
-      essential = true
-      depends_on = [
+      name              = var.service_name
+      image             = local.nginx_image
+      essential         = true
+      memoryReservation = 128
+      dependsOn = [
         {
           containerName = var.php_fpm_container_name
           condition     = "HEALTHY"
@@ -177,7 +226,7 @@ resource "aws_ecs_task_definition" "this" {
           max-buffer-size       = "25m"
           awslogs-group         = "/ecs/${var.cluster_name}/${var.service_name}"
           awslogs-create-group  = "true"
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = var.region
           awslogs-stream-prefix = "/logs"
         }
       }
@@ -193,9 +242,10 @@ resource "aws_ecs_task_definition" "this" {
       }
     },
     {
-      name      = var.php_fpm_container_name
-      image     = "${var.ecr_repository_url}:php-fpm"
-      essential = true
+      name              = var.php_fpm_container_name
+      image             = local.php_fpm_image
+      essential         = true
+      memoryReservation = 256
       mountPoints = [
         {
           sourceVolume  = "${var.service_name}-efs-volume"
@@ -213,7 +263,7 @@ resource "aws_ecs_task_definition" "this" {
       environment = [
         {
           name  = "GLPI_DB_HOST"
-          value = var.db_instance_endpoint
+          value = var.db_instance_address
         },
         {
           name  = "GLPI_DB_PORT"
@@ -247,7 +297,7 @@ resource "aws_ecs_task_definition" "this" {
           max-buffer-size       = "25m"
           awslogs-group         = "/ecs/${var.cluster_name}/${var.service_name}"
           awslogs-create-group  = "true"
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = var.region
           awslogs-stream-prefix = "/logs"
         }
       }
@@ -265,6 +315,10 @@ resource "aws_ecs_task_definition" "this" {
   ])
 
   tags = var.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ========================================================
@@ -353,7 +407,7 @@ resource "aws_security_group" "ecs_tasks" {
 resource "aws_vpc_security_group_ingress_rule" "ecs_tasks_ingress_http_ipv4" {
   security_group_id = aws_security_group.ecs_tasks.id
 
-  cidr_ipv4   = data.aws_vpc.selected.cidr_block
+  cidr_ipv4   = var.vpc_cidr_block
   from_port   = var.container_port
   ip_protocol = "tcp"
   to_port     = var.container_port
@@ -478,11 +532,15 @@ data "aws_iam_policy_document" "ecs_task_role_policy_document" {
       "logs:CreateLogStream",
       "logs:CreateLogGroup",
       "kms:GenerateDataKey",
+      "kms:Encrpyt",
       "kms:Decrypt",
       "s3:PutObject",
       "s3:GetObject",
       "s3:GetEncryptionConfiguration",
-      "s3:GetBucketLocation"
+      "s3:GetBucketLocation",
+      "elasticfilesystem:ClientMount",
+      "elasticfilesystem:ClientWrite",
+      "elasticfilesystem:DescribeMountTargets"
     ]
 
     resources = ["*"]

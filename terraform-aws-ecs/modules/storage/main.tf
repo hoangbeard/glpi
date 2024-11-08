@@ -1,23 +1,9 @@
-data "aws_caller_identity" "current" {}
-data "aws_vpc" "selected" {
-  id = var.vpc_id
-}
-
 # ========================================================
 # ECR Repository
 # ========================================================
-resource "aws_ecr_repository" "this" {
-  name                 = var.service_name
-  image_tag_mutability = "MUTABLE"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  tags = var.tags
-}
 
-resource "aws_ecr_lifecycle_policy" "this" {
-  repository = aws_ecr_repository.this.name
-  policy = jsonencode({
+locals {
+  lifecycle_policy = jsonencode({
     rules = [
       {
         rulePriority = 10
@@ -27,7 +13,7 @@ resource "aws_ecr_lifecycle_policy" "this" {
         }
         selection = {
           tagStatus      = "tagged"
-          tagPatternList = ["*"],
+          tagPatternList = ["*"]
           countType      = "imageCountMoreThan"
           countNumber    = 15
         }
@@ -47,6 +33,37 @@ resource "aws_ecr_lifecycle_policy" "this" {
       }
     ]
   })
+
+  ecr_repositories = {
+    nginx = {
+      image_tag_mutability = "MUTABLE"
+      scan_on_push         = true
+      lifecycle_policy     = local.lifecycle_policy
+    }
+    php-fpm = {
+      image_tag_mutability = "MUTABLE"
+      scan_on_push         = true
+      lifecycle_policy     = local.lifecycle_policy
+    }
+  }
+}
+
+resource "aws_ecr_repository" "this" {
+  for_each = local.ecr_repositories
+
+  name                 = "${var.app_name}-${each.key}"
+  image_tag_mutability = each.value.image_tag_mutability
+  image_scanning_configuration {
+    scan_on_push = each.value.scan_on_push
+  }
+  tags = var.tags
+}
+
+resource "aws_ecr_lifecycle_policy" "this" {
+  for_each = local.ecr_repositories
+
+  repository = aws_ecr_repository.this[each.key].name
+  policy     = each.value.lifecycle_policy
 }
 
 # ========================================================
@@ -66,7 +83,8 @@ resource "aws_db_instance" "this" {
   instance_class    = var.db_instance_class
   engine            = "mysql"
   multi_az          = false
-  engine_version    = "8.0.35"
+  engine_version    = "8.0"
+  # db_name           = "glpi"
   # engine_lifecycle_support = "open-source-rds-extended-support-disabled"
 
   # Database credentials
@@ -95,7 +113,7 @@ resource "aws_db_instance" "this" {
   performance_insights_kms_key_id       = aws_kms_key.this.arn
   performance_insights_retention_period = 7
   monitoring_interval                   = 60
-  monitoring_role_arn                   = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/rds-monitoring-role"
+  monitoring_role_arn                   = "arn:aws:iam::${var.aws_account_id}:role/rds-monitoring-role"
 
   # Storage
   storage_type          = "gp3"
@@ -311,16 +329,16 @@ resource "aws_efs_access_point" "this" {
   file_system_id = aws_efs_file_system.this.id
 
   posix_user {
-    gid = 1000
-    uid = 1000
+    gid = 33
+    uid = 33
   }
 
   root_directory {
     path = var.access_point_path
 
     creation_info {
-      owner_gid   = 1000
-      owner_uid   = 1000
+      owner_gid   = 33
+      owner_uid   = 33
       permissions = 0755
     }
   }
@@ -337,25 +355,62 @@ resource "aws_efs_access_point" "this" {
 
 data "aws_iam_policy_document" "this" {
   statement {
+    sid    = "AllowGLPIAccessWithSecureTransport"
     effect = "Allow"
-
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+      identifiers = ["arn:aws:iam::${var.aws_account_id}:root"]
     }
-
     actions = [
       "elasticfilesystem:ClientMount",
       "elasticfilesystem:ClientWrite"
     ]
-
     resources = [
       aws_efs_file_system.this.arn,
     ]
-
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
+      values   = ["true"]
+    }
+  }
+
+  statement {
+    sid    = "NonSecureTransport"
+    effect = "Deny"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    actions = ["*"]
+    resources = [
+      aws_efs_file_system.this.arn,
+    ]
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
+  statement {
+    sid    = "NonSecureTransportAccessedViaMountTarget"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    actions = [
+      "elasticfilesystem:ClientWrite",
+      "elasticfilesystem:ClientRootAccess",
+      "elasticfilesystem:ClientMount"
+    ]
+    resources = [
+      aws_efs_file_system.this.arn,
+    ]
+    condition {
+      test     = "Bool"
+      variable = "elasticfilesystem:AccessedViaMountTarget"
       values   = ["true"]
     }
   }
@@ -389,7 +444,7 @@ resource "aws_vpc_security_group_ingress_rule" "db_ingress_http_ipv4" {
   security_group_id = aws_security_group.db.id
 
   # referenced_security_group_id = aws_security_group.ecs_tasks.id
-  cidr_ipv4   = data.aws_vpc.selected.cidr_block
+  cidr_ipv4   = var.vpc_cidr_block
   from_port   = 3306
   ip_protocol = "tcp"
   to_port     = 3306
@@ -423,7 +478,7 @@ resource "aws_security_group" "efs" {
 resource "aws_vpc_security_group_ingress_rule" "efs_ingress_nfs_ipv4" {
   security_group_id = aws_security_group.efs.id
 
-  cidr_ipv4   = data.aws_vpc.selected.cidr_block
+  cidr_ipv4   = var.vpc_cidr_block
   from_port   = 2049
   ip_protocol = "tcp"
   to_port     = 2049
@@ -441,7 +496,7 @@ resource "aws_vpc_security_group_egress_rule" "efs_egress_all_traffic_ipv4" {
 # ========================================================
 
 resource "aws_kms_key" "this" {
-  description             = "Execution command logs in ${var.cluster_name} cluster"
+  description             = "The key to the encryption of everything"
   deletion_window_in_days = var.deletion_window_in_days
 }
 

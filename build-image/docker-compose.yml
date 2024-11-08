@@ -1,9 +1,10 @@
 services:
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    image: ${GIT_REPO_URL}:nginx
+    # build:
+    #   context: ./nginx
+    #   dockerfile: Dockerfile
+    # image: ${GIT_REPO_URL}:nginx
+    image: 640853836543.dkr.ecr.ap-southeast-1.amazonaws.com/glpi-nginx:latest
     hostname: web
     container_name: glpi-nginx
     environment:
@@ -25,10 +26,11 @@ services:
       - glpinet
 
   php:
-    build:
-      context: ./php-fpm
-      dockerfile: Dockerfile
-    image: ${GIT_REPO_URL}:php-fpm
+    # build:
+    #   context: ./php-fpm
+    #   dockerfile: Dockerfile
+    # image: ${GIT_REPO_URL}:php-fpm
+    image: 640853836543.dkr.ecr.ap-southeast-1.amazonaws.com/glpi-php-fpm:latest
     hostname: glpi
     container_name: glpi-fpm
     environment:

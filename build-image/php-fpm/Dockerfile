@@ -62,3 +62,6 @@ EXPOSE 9000
 
 # Set default command to run PHP-FPM in foreground mode
 CMD ["php-fpm", "-F"]
+
+# Volume for persistent data storage
+VOLUME [ "/var/www/glpi" ]

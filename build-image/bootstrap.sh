@@ -31,7 +31,7 @@ init_directories() {
 load_env() {
     echo "Setting environment variables..."
     if [ ! -f .env ]; then
-        mv .env.sample .env
+        cp .env.sample .env
     fi
     set -a
     source .env
