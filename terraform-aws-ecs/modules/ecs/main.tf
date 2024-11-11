@@ -152,14 +152,12 @@ locals {
   max_task_def_revision = max(aws_ecs_task_definition.this.revision, data.aws_ecs_task_definition.this.revision)
 
   # GLPI Nginx image
-  nginx_ecr_version = [for tag in data.aws_ecr_repository.nginx.most_recent_image_tags : tag if tag != "latest"][0]
+  nginx_ecr_version = try([for tag in data.aws_ecr_repository.nginx.most_recent_image_tags : tag if tag != "latest"][0], "latest")
   nginx_image       = "${data.aws_ecr_repository.nginx.repository_url}:${local.nginx_ecr_version}"
-  # nginx_ecr_version = data.aws_ecr_repository.nginx.most_recent_image_tags[0] == "latest" && length(data.aws_ecr_repository.nginx.most_recent_image_tags) > 1 ? data.aws_ecr_repository.nginx.most_recent_image_tags[1] : data.aws_ecr_repository.nginx.most_recent_image_tags[0]
 
   # GLPI PHP-FPM image
-  php_fpm_ecr_version = [for tag in data.aws_ecr_repository.php_fpm.most_recent_image_tags : tag if tag != "latest"][0]
+  php_fpm_ecr_version = try([for tag in data.aws_ecr_repository.php_fpm.most_recent_image_tags : tag if tag != "latest"][0], "latest")
   php_fpm_image       = "${data.aws_ecr_repository.php_fpm.repository_url}:${local.php_fpm_ecr_version}"
-  # php_fpm_ecr_version = data.aws_ecr_repository.php_fpm.most_recent_image_tags[0] == "latest" && length(data.aws_ecr_repository.php_fpm.most_recent_image_tags) > 1 ? data.aws_ecr_repository.php_fpm.most_recent_image_tags[1] : data.aws_ecr_repository.php_fpm.most_recent_image_tags[0]
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -288,6 +286,14 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "GLPI_LANGUAGE"
           value = "en_US"
+        },
+        {
+          "name" : "GLPI_VERSION",
+          "value" : "10.0.17"
+        },
+        {
+          "name" : "GLPI_SAML_VERSION",
+          "value" : "v1.1.10"
         }
       ]
       logConfiguration = {

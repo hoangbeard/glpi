@@ -1,10 +1,9 @@
 services:
   nginx:
-    # build:
-    #   context: ./nginx
-    #   dockerfile: Dockerfile
-    # image: ${GIT_REPO_URL}:nginx
-    image: 640853836543.dkr.ecr.ap-southeast-1.amazonaws.com/glpi-nginx:latest
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: ${ECR_REPO_ENDPOINT}/glpi-nginx:latest
     hostname: web
     container_name: glpi-nginx
     environment:
@@ -26,11 +25,10 @@ services:
       - glpinet
 
   php:
-    # build:
-    #   context: ./php-fpm
-    #   dockerfile: Dockerfile
-    # image: ${GIT_REPO_URL}:php-fpm
-    image: 640853836543.dkr.ecr.ap-southeast-1.amazonaws.com/glpi-php-fpm:latest
+    build:
+      context: ./php-fpm
+      dockerfile: Dockerfile
+    image: ${ECR_REPO_ENDPOINT}/glpi-php-fpm:latest
     hostname: glpi
     container_name: glpi-fpm
     environment:
@@ -41,6 +39,8 @@ services:
       - GLPI_DB_PASSWORD=${GLPI_DB_PASSWORD}
       - GLPI_LANGUAGE=${GLPI_LANGUAGE}
       - GLPI_ADMIN_USER=${GLPI_ADMIN_USER}
+      - GLPI_VERSION=${GLPI_VERSION}
+      - GLPI_SAML_VERSION=${GLPI_SAML_VERSION}
     expose:
       - 9000
     depends_on:

@@ -7,6 +7,19 @@ locals {
     rules = [
       {
         rulePriority = 10
+        description  = "Expire images older than 7 days"
+        action = {
+          type = "expire"
+        }
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 7
+        }
+      },
+      {
+        rulePriority = 11
         description  = "Keep last 15 images"
         action = {
           type = "expire"
@@ -16,19 +29,6 @@ locals {
           tagPatternList = ["*"]
           countType      = "imageCountMoreThan"
           countNumber    = 15
-        }
-      },
-      {
-        rulePriority = 11
-        description  = "Expire images older than 14 days"
-        action = {
-          type = "expire"
-        }
-        selection = {
-          tagStatus   = "untagged"
-          countType   = "sinceImagePushed"
-          countUnit   = "days"
-          countNumber = 7
         }
       }
     ]

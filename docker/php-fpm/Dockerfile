@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libgettextpo-dev \
     zlib1g-dev \
+    wget \
     zip && \
     docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) gd && \
@@ -46,7 +47,7 @@ COPY docker-entrypoint.sh /
 
 # Copy source
 WORKDIR /var/www/glpi
-COPY --chown=www-data:www-data glpi/ ./
+# COPY --chown=www-data:www-data glpi/ ./
 
 # Set correct permissions and remove unnecessary files
 RUN chmod 2775 /var/www/glpi && \
