@@ -20,9 +20,9 @@ This is a Docker image for [GLPI](https://glpi-project.org/).
 2. Run following script to start docker compose
 
     ```bash
-    cd glpi/build-image
+    cd glpi/docker
     chmod +x bootstrap.sh
-    ./bootstrap.sh compose
+    docker compose up --build
     ```
 
 3. Open your browser and go to `http://localhost`
@@ -38,7 +38,7 @@ This is a Docker image for [GLPI](https://glpi-project.org/).
 2. Run following script to start docker compose
 
     ```bash
-    cd glpi/build-image
+    cd glpi/docker
     chmod +x bootstrap.sh
     ./bootstrap.sh build-push
     ```
