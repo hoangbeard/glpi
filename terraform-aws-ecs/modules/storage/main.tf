@@ -329,17 +329,18 @@ resource "aws_efs_access_point" "this" {
   file_system_id = aws_efs_file_system.this.id
 
   posix_user {
-    gid = 33
-    uid = 33
+    gid            = 1000
+    uid            = 1000
+    secondary_gids = [33]
   }
 
   root_directory {
     path = var.access_point_path
 
     creation_info {
-      owner_gid   = 33
-      owner_uid   = 33
-      permissions = 0755
+      owner_gid   = 1000
+      owner_uid   = 1000
+      permissions = 0775
     }
   }
 

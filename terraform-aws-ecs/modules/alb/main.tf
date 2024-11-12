@@ -73,7 +73,10 @@ resource "aws_security_group" "alb" {
   name_prefix = "${var.service_name}-alb-sg-"
   description = "Allow inbound access from the Internet"
   vpc_id      = var.vpc_id
-  tags        = var.tags
+  tags = merge(
+    { Name = "${var.service_name}-alb-sg" },
+    var.tags
+  )
 
   lifecycle {
     create_before_destroy = true

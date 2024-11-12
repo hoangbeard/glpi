@@ -73,6 +73,8 @@ module "alb" {
 module "ecs" {
   source = "../../modules/ecs"
 
+  depends_on = [ module.storage ]
+
   tags           = local.tags
   app_name       = local.app_name
   environment    = local.environment

@@ -403,7 +403,10 @@ resource "aws_security_group" "ecs_tasks" {
   name_prefix = "${var.service_name}-ecs-tasks-sg-"
   description = "Allow inbound access from the VPC only"
   vpc_id      = var.vpc_id
-  tags        = var.tags
+  tags = merge(
+    { Name = "${var.service_name}-ecs-tasks-sg" },
+    var.tags
+  )
 
   lifecycle {
     create_before_destroy = true
@@ -476,7 +479,11 @@ data "aws_iam_policy_document" "ecs_task_exec_role_policy_document" {
       "logs:DescribeLogGroups",
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
-      "logs:PutLogEvents"
+      "logs:PutLogEvents",
+      "elasticfilesystem:ClientMount",
+      "elasticfilesystem:ClientWrite",
+      "elasticfilesystem:DescribeMountTargets",
+      "elasticfilesystem:DescribeFileSystems"
     ]
 
     resources = ["*"]
@@ -546,7 +553,9 @@ data "aws_iam_policy_document" "ecs_task_role_policy_document" {
       "s3:GetBucketLocation",
       "elasticfilesystem:ClientMount",
       "elasticfilesystem:ClientWrite",
-      "elasticfilesystem:DescribeMountTargets"
+      "elasticfilesystem:DescribeMountTargets",
+      "elasticfilesystem:DescribeFileSystems",
+      "elasticfilesystem:ClientRootAccess"
     ]
 
     resources = ["*"]

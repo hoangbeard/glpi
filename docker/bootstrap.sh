@@ -2,7 +2,7 @@
 
 
 # Constants
-ECR_TAG='v1.0.0'
+ECR_TAG='3cfa327'
 
 
 # Check if arguments are provided and validate

@@ -7,6 +7,7 @@ LABEL author="HoangBeard - <github.com/hoangbeard>" \
 # Install necessary dependencies
 RUN apt-get update && apt-get install -y \
     netcat-openbsd \
+    procps \
     libbz2-dev \
     libc-dev \
     libkrb5-dev \
@@ -50,8 +51,8 @@ WORKDIR /var/www/glpi
 # COPY --chown=www-data:www-data glpi/ ./
 
 # Set correct permissions and remove unnecessary files
-RUN chmod 2775 /var/www/glpi && \
-    find /var/www/glpi -type d -exec chmod 2775 {} \; && \
+RUN chmod 0775 /var/www/glpi && \
+    find /var/www/glpi -type d -exec chmod 0775 {} \; && \
     find /var/www/glpi -type f -exec chmod 0664 {} \; && \
     chmod +x /docker-entrypoint.sh
 
