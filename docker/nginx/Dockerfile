@@ -21,11 +21,11 @@ COPY docker-entrypoint.sh /
 
 # Copy source
 WORKDIR /var/www/glpi
-# COPY --chown=www-data:www-data glpi/ ./
+COPY --chown=www-data:www-data glpi/ ./
 
 # Set correct permissions and remove unnecessary files
-RUN chmod 0775 /var/www/glpi && \
-    find /var/www/glpi -type d -exec chmod 0775 {} \; && \
+RUN chmod 2775 /var/www/glpi && \
+    find /var/www/glpi -type d -exec chmod 2775 {} \; && \
     find /var/www/glpi -type f -exec chmod 0664 {} \; && \
     chmod +x /docker-entrypoint.sh
 

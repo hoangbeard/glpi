@@ -43,17 +43,22 @@ COPY config/php.ini /usr/local/etc/php/php.ini
 COPY config/php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY config/www.conf /usr/local/etc/php-fpm.d/www.conf
 
+COPY --chown=www-data:www-data config/local_define.php /glpi-data/config/local_define.php
+
 # Copy the docker-entrypoint.sh script to the root directory
 COPY docker-entrypoint.sh /
 
 # Copy source
 WORKDIR /var/www/glpi
-# COPY --chown=www-data:www-data glpi/ ./
+COPY --chown=www-data:www-data glpi/ ./
 
 # Set correct permissions and remove unnecessary files
-RUN chmod 0775 /var/www/glpi && \
-    find /var/www/glpi -type d -exec chmod 0775 {} \; && \
+RUN mkdir -p /glpi-data/files /glpi-data/log && \
+    chmod 2775 /var/www/glpi /glpi-data && \
+    find /var/www/glpi -type d -exec chmod 2775 {} \; && \
     find /var/www/glpi -type f -exec chmod 0664 {} \; && \
+    find /glpi-data -type d -exec chmod 2775 {} \; && \
+    find /glpi-data -type f -exec chmod 0664 {} \; && \
     chmod +x /docker-entrypoint.sh
 
 # Set the entrypoint for the container to be the docker-entrypoint.sh script

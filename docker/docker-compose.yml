@@ -13,8 +13,6 @@ services:
     depends_on:
       php:
         condition: service_healthy
-    # volumes:
-    #   - glpi:/var/www/glpi
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/index.php || exit 1"]
@@ -87,14 +85,4 @@ networks:
 
 volumes:
   dbdata:
-    driver: local
-    driver_opts:
-      type: none
-      device: "${PWD}/data/db"
-      o: bind
   glpi:
-    driver: local
-    driver_opts:
-      type: none
-      device: "${PWD}/data/glpi"
-      o: bind
