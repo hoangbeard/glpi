@@ -48,7 +48,7 @@ extract_files() {
 # Deploy files to web servers
 deploy_files() {
     echo "Deploying files..."
-    cp -a "${GLPI_SOURCES_DIR}/glpi/." /var/www/glpi/
+    cp -r "${GLPI_SOURCES_DIR}/glpi" /var/www/
     echo "Deployment complete."
 
     echo "Cleaning up..."
@@ -98,6 +98,18 @@ setup_glpi_configs() {
         echo "----- Checking database schema integrity... -----"
         php bin/console db:check_schema_integrity --no-interaction -vv
         echo "Check database schema integrity done."
+
+        # Access to timezone database
+        echo "----- Enabling timezones support... -----"
+        php bin/console db:enable_timezones --no-interaction -vv
+        echo "Enable timezones support done."
+
+        # Plugins installation
+        echo "----- Installing GLPI plugins... -----"
+        php bin/console glpi:plugin:install --all --username="${GLPI_ADMIN_USER}" --force
+        php bin/console glpi:plugin:activate --all
+        echo "Install GLPI plugins done."
+
     else
         echo "GLPI is already installed."
         echo "----- Reconfigure GLPI database configuration... -----"
@@ -112,17 +124,6 @@ setup_glpi_configs() {
         
         echo "GLPI database configuration updated."
     fi
-
-    # Access to timezone database
-    echo "----- Enabling timezones support... -----"
-    php bin/console db:enable_timezones --no-interaction -vv
-    echo "Enable timezones support done."
-
-    # Plugins installation
-    echo "----- Installing GLPI plugins... -----"
-    php bin/console glpi:plugin:install --all --username="${GLPI_ADMIN_USER}" --force
-    php bin/console glpi:plugin:activate --all
-    echo "Install GLPI plugins done."
 
     # System status
     echo "----- Checking GLPI system status... -----"

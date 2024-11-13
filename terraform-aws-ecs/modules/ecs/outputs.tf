@@ -42,7 +42,10 @@ output "service_discovery_id" {
 
 output "cloud_watch_log_group_name" {
   description = "The name of the cloud watch log group"
-  value       = aws_cloudwatch_log_group.this.name
+  value = {
+    exec_command  = aws_cloudwatch_log_group.exec_command.name
+    container_log = aws_cloudwatch_log_group.container_log.name
+  }
 }
 
 # ========================================================

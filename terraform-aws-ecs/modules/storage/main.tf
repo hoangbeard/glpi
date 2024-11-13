@@ -51,11 +51,15 @@ locals {
 resource "aws_ecr_repository" "this" {
   for_each = local.ecr_repositories
 
-  name                 = "${var.app_name}-${each.key}"
+  name         = "${var.app_name}-${each.key}"
+  force_delete = true
+
   image_tag_mutability = each.value.image_tag_mutability
+
   image_scanning_configuration {
     scan_on_push = each.value.scan_on_push
   }
+
   tags = var.tags
 }
 
@@ -329,17 +333,17 @@ resource "aws_efs_access_point" "this" {
   file_system_id = aws_efs_file_system.this.id
 
   posix_user {
-    gid            = 1000
-    uid            = 1000
-    secondary_gids = [33]
+    uid            = 33
+    gid            = 33
+    secondary_gids = [1000]
   }
 
   root_directory {
     path = var.access_point_path
 
     creation_info {
-      owner_gid   = 1000
-      owner_uid   = 1000
+      owner_gid   = 33
+      owner_uid   = 33
       permissions = 0775
     }
   }
@@ -431,6 +435,7 @@ resource "aws_security_group" "db" {
   name_prefix = "${var.service_name}-db-sg-"
   description = "Allow inbound access from the ECS only"
   vpc_id      = var.vpc_id
+  
   tags = merge(
     { "Name" = "${var.service_name}-db-sg" },
     var.tags

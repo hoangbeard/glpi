@@ -13,11 +13,11 @@ services:
     depends_on:
       php:
         condition: service_healthy
-    volumes:
-      - glpi:/var/www/glpi
+    # volumes:
+    #   - glpi:/var/www/glpi
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost/index.php || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -47,7 +47,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - glpi:/var/www/glpi
+      - glpi:/glpi-data:rw
     restart: unless-stopped
     networks:
       - glpinet
@@ -71,7 +71,7 @@ services:
     ports:
       - "6033:3306"
     volumes:
-      - dbdata:/var/lib/mysql
+      - dbdata:/var/lib/mysql:rw
       - ./mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql
     restart: unless-stopped
     networks:
@@ -87,4 +87,14 @@ networks:
 
 volumes:
   dbdata:
+    driver: local
+    driver_opts:
+      type: none
+      device: "${PWD}/data/db"
+      o: bind
   glpi:
+    driver: local
+    driver_opts:
+      type: none
+      device: "${PWD}/data/glpi"
+      o: bind

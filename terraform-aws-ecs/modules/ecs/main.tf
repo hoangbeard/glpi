@@ -17,7 +17,7 @@ resource "aws_ecs_cluster" "this" {
 
       log_configuration {
         cloud_watch_encryption_enabled = false
-        cloud_watch_log_group_name     = aws_cloudwatch_log_group.this.name
+        cloud_watch_log_group_name     = aws_cloudwatch_log_group.exec_command.name
       }
     }
   }
@@ -41,8 +41,16 @@ resource "aws_ecs_cluster_capacity_providers" "this" {
 # CloudWatch Log Group
 # ========================================================
 
-resource "aws_cloudwatch_log_group" "this" {
-  name              = "${var.service_name}-cwlg"
+resource "aws_cloudwatch_log_group" "exec_command" {
+  name              = "${var.cluster_name}-exec-command-cwlg"
+  retention_in_days = var.retention_in_days
+  skip_destroy      = false
+  # kms_key_id        = var.kms_key_id
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "container_log" {
+  name              = "/ecs/${var.cluster_name}/${var.service_name}-cwlg"
   retention_in_days = var.retention_in_days
   skip_destroy      = false
   # kms_key_id        = var.kms_key_id
@@ -53,13 +61,12 @@ resource "aws_cloudwatch_log_group" "this" {
 # ECS Service
 # ========================================================
 resource "aws_ecs_service" "this" {
-  name                              = var.service_name
-  cluster                           = aws_ecs_cluster.this.id
-  task_definition                   = aws_ecs_task_definition.this.arn
-  desired_count                     = var.desired_count
-  enable_execute_command            = true
-  force_new_deployment              = true
-  health_check_grace_period_seconds = 120
+  name                   = var.service_name
+  cluster                = aws_ecs_cluster.this.id
+  task_definition        = aws_ecs_task_definition.this.arn
+  desired_count          = var.desired_count
+  enable_execute_command = true
+  force_new_deployment   = true
   # launch_type     = "FARGATE"
 
   capacity_provider_strategy {
@@ -73,6 +80,7 @@ resource "aws_ecs_service" "this" {
     subnets         = var.subnets
   }
 
+  health_check_grace_period_seconds = 300
   load_balancer {
     target_group_arn = var.target_group_arn
     container_name   = var.service_name
@@ -158,6 +166,9 @@ locals {
   # GLPI PHP-FPM image
   php_fpm_ecr_version = try([for tag in data.aws_ecr_repository.php_fpm.most_recent_image_tags : tag if tag != "latest"][0], "latest")
   php_fpm_image       = "${data.aws_ecr_repository.php_fpm.repository_url}:${local.php_fpm_ecr_version}"
+
+  volume_name    = "${var.service_name}-efs-volume"
+  container_path = "/var/www/glpi"
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -171,7 +182,7 @@ resource "aws_ecs_task_definition" "this" {
   skip_destroy             = true
 
   volume {
-    name = "${var.service_name}-efs-volume"
+    name = local.volume_name
 
     efs_volume_configuration {
       file_system_id          = var.efs_file_system_id
@@ -199,8 +210,8 @@ resource "aws_ecs_task_definition" "this" {
       ]
       mountPoints = [
         {
-          sourceVolume  = "${var.service_name}-efs-volume"
-          containerPath = "/var/www/glpi"
+          sourceVolume  = local.volume_name
+          containerPath = local.container_path
           readOnly      = false
         }
       ]
@@ -222,7 +233,7 @@ resource "aws_ecs_task_definition" "this" {
         options = {
           mode                  = "non-blocking"
           max-buffer-size       = "25m"
-          awslogs-group         = "/ecs/${var.cluster_name}/${var.service_name}"
+          awslogs-group         = aws_cloudwatch_log_group.container_log.name
           awslogs-create-group  = "true"
           awslogs-region        = var.region
           awslogs-stream-prefix = "/logs"
@@ -231,7 +242,7 @@ resource "aws_ecs_task_definition" "this" {
       healthCheck = {
         command = [
           "CMD-SHELL",
-          "curl -f http://localhost || exit 1"
+          "curl -f http://localhost/index.php || exit 1"
         ]
         interval    = 30
         timeout     = 5
@@ -246,8 +257,8 @@ resource "aws_ecs_task_definition" "this" {
       memoryReservation = 256
       mountPoints = [
         {
-          sourceVolume  = "${var.service_name}-efs-volume"
-          containerPath = "/var/www/glpi"
+          sourceVolume  = local.volume_name
+          containerPath = local.container_path
           readOnly      = false
         }
       ]
@@ -301,7 +312,7 @@ resource "aws_ecs_task_definition" "this" {
         options = {
           mode                  = "non-blocking"
           max-buffer-size       = "25m"
-          awslogs-group         = "/ecs/${var.cluster_name}/${var.service_name}"
+          awslogs-group         = aws_cloudwatch_log_group.container_log.name
           awslogs-create-group  = "true"
           awslogs-region        = var.region
           awslogs-stream-prefix = "/logs"
@@ -403,6 +414,7 @@ resource "aws_security_group" "ecs_tasks" {
   name_prefix = "${var.service_name}-ecs-tasks-sg-"
   description = "Allow inbound access from the VPC only"
   vpc_id      = var.vpc_id
+  
   tags = merge(
     { Name = "${var.service_name}-ecs-tasks-sg" },
     var.tags
@@ -573,7 +585,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_role_managed_policy_attachme
 }
 
 # ========================================================
-# Scheduler
+# Scheduler Role
 # ========================================================
 
 resource "aws_iam_role" "scheduler_role" {

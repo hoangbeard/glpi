@@ -1,7 +1,7 @@
 # Directories ignore
 **/glpi
 **/certs
-**/dbdata
+**/data
 **/.infracost
 
 # Created by https://www.toptal.com/developers/gitignore/api/archives
