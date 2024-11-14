@@ -168,7 +168,6 @@ locals {
   php_fpm_image       = "${data.aws_ecr_repository.php_fpm.repository_url}:${local.php_fpm_ecr_version}"
 
   volume_name    = "${var.service_name}-efs-volume"
-  container_path = "/var/www/glpi"
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -206,13 +205,6 @@ resource "aws_ecs_task_definition" "this" {
         {
           containerName = var.php_fpm_container_name
           condition     = "HEALTHY"
-        }
-      ]
-      mountPoints = [
-        {
-          sourceVolume  = local.volume_name
-          containerPath = local.container_path
-          readOnly      = false
         }
       ]
       portMappings = [
@@ -258,7 +250,7 @@ resource "aws_ecs_task_definition" "this" {
       mountPoints = [
         {
           sourceVolume  = local.volume_name
-          containerPath = local.container_path
+          containerPath = var.access_point_path
           readOnly      = false
         }
       ]
@@ -293,10 +285,6 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "GLPI_ADMIN_USER"
           value = "glpi"
-        },
-        {
-          name  = "GLPI_LANGUAGE"
-          value = "en_US"
         },
         {
           "name" : "GLPI_VERSION",

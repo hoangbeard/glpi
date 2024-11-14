@@ -132,6 +132,13 @@ variable "efs_access_point_id" {
   type        = string
 }
 
+variable "access_point_path" {
+  description = "Access point path for the EFS file system"
+  type        = string
+  default     = "/glpi-data"
+}
+
+
 # ========================================================
 # RDS Variables
 # ========================================================

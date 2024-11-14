@@ -1,199 +1,111 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
-# Constants
-GLPI_SOURCES_DIR='/tmp/sources'
-GLPI_PLUGINS_DIR="$GLPI_SOURCES_DIR/plugins"
+# Check system information
+echo "----- System Information -----"
+echo "OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d '=' -f 2)"
+echo "Kernel: $(uname -r)"
+echo "CPU: $(lscpu | grep 'Model name' | cut -d ':' -f 2 | xargs)"
+echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+echo "Disk: $(df -h / | tail -1 | awk '{print $2}')"
+echo "User: $(whoami)"
+echo "Architecture: $(uname -m)"
+echo "Hostname: $(hostname)"
+echo "Uptime: $(uptime -p)"
+hostname -I | awk '{print "IP Address: " $1}'
+echo "------------------------------"
 
 # Wait for MySQL to be ready
-wait_for_mysql() {
-    echo "Waiting for MySQL to be ready..."
-    while ! nc -z ${GLPI_DB_HOST} ${GLPI_DB_PORT}; do
-        sleep 1
-    done
-    echo "MySQL is ready."
-}
+echo "----- Checking database connecion -----"
+while ! nc -z ${GLPI_DB_HOST} ${GLPI_DB_PORT}; do
+    sleep 5
+    echo -n "Waiting for MySQL to be ready..."
+done
+echo "MySQL is ready."
 
-# Download GLPI source
-download_glpi() {
-    GLPI_SOURCE="$GLPI_SOURCES_DIR/glpi-${GLPI_VERSION}.tgz"
-    if [ ! -f "$GLPI_SOURCE" ]; then
-        echo "Downloading GLPI source..."
-        wget -q -P "$GLPI_SOURCES_DIR" \
-        "https://github.com/glpi-project/glpi/releases/download/${GLPI_VERSION}/glpi-${GLPI_VERSION}.tgz"
-        echo "Download GLPI source complete."
-    fi
-}
+# Setting GLPI configuration
+echo "=============================="
+echo "Start GLPI configuration setup"
+echo "=============================="
 
-# Download GLPI SAML plugin
-download_plugin() {
-    SAML_PLUGIN="$GLPI_PLUGINS_DIR/glpisaml.zip"
-    if [ ! -f "$SAML_PLUGIN" ]; then
-        echo "Downloading GLPI SAML plugin..."
-        wget -q -P "$GLPI_PLUGINS_DIR" \
-        "https://codeberg.org/QuinQuies/glpisaml/releases/download/${GLPI_SAML_VERSION}/glpisaml.zip"
-        echo "Download GLPI SAML plugin complete."
-    fi
-}
+echo "----- Checking system requirements -----"
+php bin/console glpi:system:check_requirements --no-interaction -vvv
+echo "Check system requirements done."
 
-# Extract files
-extract_files() {
-    echo "Extracting GLPI files..."
-    tar -xzf "$GLPI_SOURCE" -C "${GLPI_SOURCES_DIR}/glpi" --strip-components=1
-    unzip -q "$SAML_PLUGIN" -d "${GLPI_SOURCES_DIR}/glpi/plugins/"
-    echo "Extract complete."
-}
+# Check if GLPI is already installed
+if [ ! -f /glpi-data/config/config_db.php ]; then
+    # GLPI is not installed, run installation
+    echo "----- Installing GLPI database -----"
+    php bin/console db:install -vvv \
+    --db-host="${GLPI_DB_HOST}" \
+    --db-port="${GLPI_DB_PORT}" \
+    --db-name="${GLPI_DB_DATABASE}" \
+    --db-user="${GLPI_DB_USER}" \
+    --db-password="${GLPI_DB_PASSWORD}" \
+    --no-interaction \
+    --force
+    
+    echo "Install GLPI database done."
+    
+    # Check database schema integrity
+    echo "----- Checking database schema integrity -----"
+    php bin/console db:check_schema_integrity --no-interaction -vvv
+    echo "Check database schema integrity done."
+    
+    # Access to timezone database
+    echo "----- Enabling timezones support -----"
+    php bin/console db:enable_timezones --no-interaction -vvv
+    echo "Enable timezones support done."
+else
+    # Reconfigure GLPI database configuration
+    echo "----- GLPI is already installed. Re-configuring database configuration -----"
+    php bin/console db:configure -vvv \
+    --db-host="${GLPI_DB_HOST}" \
+    --db-port="${GLPI_DB_PORT}" \
+    --db-name="${GLPI_DB_DATABASE}" \
+    --db-user="${GLPI_DB_USER}" \
+    --db-password="${GLPI_DB_PASSWORD}" \
+    --no-interaction \
+    --reconfigure
+    
+    echo "GLPI database configuration done."
 
-# Deploy files to web servers
-deploy_files() {
-    echo "Deploying files..."
-    cp -r "${GLPI_SOURCES_DIR}/glpi" /var/www/
-    echo "Deployment complete."
+    # Update DB
+    echo "----- Updating database -----"
+    php bin/console db:update -vvv
+    echo "Update database done."
 
-    echo "Cleaning up..."
-    rm -rf "${GLPI_SOURCES_DIR}" "/tmp/*"
-    echo "Cleanup complete."
-}
+    # Check database schema integrity
+    echo "----- Checking database schema integrity -----"
+    php bin/console db:check_schema_integrity --no-interaction -vvv
+    echo "Check database schema integrity done."
+fi
 
-setup_glpi_sources() {
-    echo "----- Setting up GLPI Sources and Plugins... -----"
+# Plugins installation
+echo "----- Installing GLPI plugins -----"
+php bin/console glpi:plugin:install --all --username="${GLPI_ADMIN_USER}" --force
+php bin/console glpi:plugin:activate --all
+echo "Install GLPI plugins done."
 
-    # Create directories if they don't exist
-    mkdir -p "${GLPI_SOURCES_DIR}/glpi" "${GLPI_PLUGINS_DIR}"
+# Remove install/ directory
+echo "----- Removing Install directory -----"
+if [ -e /var/www/glpi/install ]; then
+    rm -rf /var/www/glpi/install
+    echo "Remove Install directory done."
+else
+    echo "Install directory does not exist. Skipping removal."
+fi
 
-    echo "GLPI version: ${GLPI_VERSION}"
-    echo "GLPI SAML version: ${GLPI_SAML_VERSION}"
-    download_glpi
-    download_plugin
-    extract_files
-    deploy_files
+# System status
+echo "----- Checking GLPI system status -----"
+php bin/console config:set --version
+php bin/console glpi:system:status --format=json
+echo "Check GLPI system status done."
 
-    echo "GLPI setup sources complete."
-}
+echo ""
+echo "======================="
+echo "GLPI setting completed."
+echo "======================="
 
-setup_glpi_configs() {
-    echo "----- Setting up GLPI Configurations... -----"
-    # Check system requirements
-    echo "----- Checking system requirements... -----"
-    php bin/console glpi:system:check_requirements --no-interaction -vv --config-dir=/glpi-data/config
-    echo "Check system requirements done."
-
-    # Check if GLPI is already installed
-    # if [ ! -f /var/www/glpi/config/config_db.php ]; then
-    if [ ! -f /glpi-data/config/config_db.php ]; then
-        # GLPI is not installed, run installation
-        echo "----- Installing GLPI database... -----"
-        php bin/console db:install -vv \
-            --config-dir=/glpi-data/config \
-            --db-host="${GLPI_DB_HOST}" \
-            --db-port="${GLPI_DB_PORT}" \
-            --db-name="${GLPI_DB_DATABASE}" \
-            --db-user="${GLPI_DB_USER}" \
-            --db-password="${GLPI_DB_PASSWORD}" \
-            --no-interaction \
-            --force
-            
-        echo "Install GLPI database done."
-
-        # Check database schema integrity
-        echo "----- Checking database schema integrity... -----"
-        php bin/console db:check_schema_integrity --no-interaction -vv --config-dir=/glpi-data/config
-        echo "Check database schema integrity done."
-
-        # Access to timezone database
-        echo "----- Enabling timezones support... -----"
-        php bin/console db:enable_timezones --no-interaction -vv --config-dir=/glpi-data/config
-        echo "Enable timezones support done."
-
-        # Plugins installation
-        echo "----- Installing GLPI plugins... -----"
-        php bin/console glpi:plugin:install --all --username="${GLPI_ADMIN_USER}" --force --config-dir=/glpi-data/config
-        php bin/console glpi:plugin:activate --all --config-dir=/glpi-data/config
-        echo "Install GLPI plugins done."
-
-    else
-        echo "GLPI is already installed."
-        echo "----- Reconfigure GLPI database configuration... -----"
-        php bin/console db:configure -vv \
-            --config-dir=/glpi-data/config \
-            --db-host="${GLPI_DB_HOST}" \
-            --db-port="${GLPI_DB_PORT}" \
-            --db-name="${GLPI_DB_DATABASE}" \
-            --db-user="${GLPI_DB_USER}" \
-            --db-password="${GLPI_DB_PASSWORD}" \
-            --no-interaction \
-            --reconfigure
-        
-        echo "GLPI database configuration updated."
-    fi
-
-    # System status
-    echo "----- Checking GLPI system status... -----"
-    php bin/console config:set --version --config-dir=/glpi-data/config
-    php bin/console glpi:system:status --format=json --config-dir=/glpi-data/config
-    echo "Check GLPI system status done."
-
-    # Remove install/ directory
-    echo "----- Removing install/ directory... -----"
-    if [ -e /var/www/glpi/install ]; then
-        rm -rf /var/www/glpi/install
-        echo "Removed install/ directory."
-    else
-        echo "install/ directory does not exist."
-    fi
-
-    # Set permissions
-    echo "----- Setting permissions... -----"
-    # chown -R www-data:www-data /var/www/glpi
-    chmod 2775 /var/www/glpi /glpi-data
-    find /var/www/glpi -type d -exec chmod 2775 {} \;
-    find /var/www/glpi -type f -exec chmod 0664 {} \;
-    find /glpi-data -type d -exec chmod 2775 {} \;
-    find /glpi-data -type f -exec chmod 0664 {} \;
-    echo "Set permissions done."
-
-    echo "GLPI installation complete."
-}
-
-main() {
-    # Check system information
-    echo "----- System Information -----"
-    echo "OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d '=' -f 2)"
-    echo "Kernel: $(uname -r)"
-    echo "CPU: $(lscpu | grep 'Model name' | cut -d ':' -f 2 | xargs)"
-    echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
-    echo "Disk: $(df -h / | tail -1 | awk '{print $2}')"
-    echo "User: $(whoami)"
-    echo "Architecture: $(uname -m)"
-    echo "Hostname: $(hostname)"
-    echo "Uptime: $(uptime -p)"
-    hostname -I | awk '{print "IP Address: " $1}'
-    echo "GLPI version: $(php bin/console config:set --version)"
-    echo "------------------------------"
-
-    # # 1. Setup GLPI sources
-    # if [ -d /var/www/glpi ]; then
-    #     echo "GLPI is already installed."
-    #     if [ -z "$(ls -A /var/www/glpi)" ]; then
-    #         echo "GLPI directory is empty. Installing GLPI..."
-    #         setup_glpi_sources
-    #     else
-    #         echo "GLPI directory is not empty. Skipping GLPI installation."
-    #     fi
-    # else
-    #     echo "GLPI is not exited."
-    #     setup_glpi_sources
-    # fi
-
-    # 2. Wait for MySQL to be ready
-    wait_for_mysql
-    # 3. Setup GLPI database
-    setup_glpi_configs
-}
-
-# Call the main function
-main
-
-# Execute the main container command
 exec "$@"

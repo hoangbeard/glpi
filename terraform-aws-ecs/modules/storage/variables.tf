@@ -82,7 +82,7 @@ variable "subnets" {
 variable "access_point_path" {
   description = "Access point path for the EFS file system"
   type        = string
-  default     = "/data"
+  default     = "/glpi-data"
 }
 
 # ========================================================

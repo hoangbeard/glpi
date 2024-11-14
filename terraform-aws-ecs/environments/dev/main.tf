@@ -91,11 +91,16 @@ module "ecs" {
   nginx_image_name       = "${local.app_name}-nginx"
   php_fpm_image_name     = "${local.app_name}-php-fpm"
 
+  # KMS
   kms_key_id        = module.storage.kms_key_id
   retention_in_days = 90
 
+  # EFS
+  access_point_path   = local.access_point_path
   efs_file_system_id  = module.storage.efs_file_system_id
   efs_access_point_id = module.storage.efs_access_point_id
+
+  # RDS
   db_instance_address = module.storage.db_instance_address
 }
 

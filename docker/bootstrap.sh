@@ -3,6 +3,9 @@
 
 # Constants
 ECR_TAG='3cfa327'
+AWS_REGION=ap-southeast-1
+AWS_ACCOUNT_ID=640853836543
+ECR_REPO_ENDPOINT="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 
 # Check if arguments are provided and validate
@@ -32,6 +35,76 @@ load_env() {
     echo "Set environment variables complete."
 }
 
+# Download sources
+download_glpi() {
+    echo "----- Downloading GLPI source -----"
+    GLPI_LATEST_VERSION=$(curl -s https://api.github.com/repos/glpi-project/glpi/releases/latest | grep tag_name | cut -d '"' -f 4)
+    
+    if [ -z $GLPI_VERSION ]; then 
+        GLPI_VERSION=$GLPI_LATEST_VERSION
+        echo "GLPI Version: ${GLPI_VERSION}"
+    elif [ "$GLPI_VERSION" != "$GLPI_LATEST_VERSION" ]; then
+        echo "Notice: Current version ($GLPI_VERSION) differs from latest version ($GLPI_LATEST_VERSION)"
+        echo "Would you like to:"
+        echo "1) Keep current version ($GLPI_VERSION)"
+        echo "2) Use latest version ($GLPI_LATEST_VERSION)"
+        read -p "Enter your choice (1 or 2): " version_choice
+        
+        case $version_choice in
+            2)
+                GLPI_VERSION=$GLPI_LATEST_VERSION
+                echo "Switching to latest version: $GLPI_VERSION"
+                ;;
+            *)
+                echo "Keeping current version: $GLPI_VERSION"
+                ;;
+        esac
+    else
+        echo "GLPI Version: ${GLPI_VERSION}"
+    fi
+
+    GLPI_DOWNLOAD_URL=$(curl -s https://api.github.com/repos/glpi-project/glpi/releases/tags/${GLPI_VERSION} | grep browser_download_url | cut -d '"' -f 4)
+
+    if [ ! -f "glpi-${GLPI_VERSION}.tgz" ]; then
+        wget -q -P . ${GLPI_DOWNLOAD_URL}
+    fi
+    echo "Download GLPI source done."
+
+    echo "----- Downloading GLPI SAML plugin -----"
+    if [ -z $GLPI_SAML_VERSION ]; then
+        GLPI_SAML_VERSION=v1.1.10
+    fi
+
+    GLPI_SAML_DOWNLOAD_URL="https://codeberg.org/QuinQuies/glpisaml/releases/download/${GLPI_SAML_VERSION}/glpisaml.zip"
+
+    if [ ! -f glpisaml.zip ]; then
+        wget -q -P . ${GLPI_SAML_DOWNLOAD_URL}
+    fi
+    echo "Download GLPI SAML plugin done."
+}
+
+deploy_glpi() {
+    echo "----- Extracting files -----"
+    mkdir -p glpi
+    tar -xzf "glpi-${GLPI_VERSION}.tgz" -C glpi --strip-components=1
+    unzip -q glpisaml.zip -d glpi/plugins/
+    echo "Extract files done."
+
+    echo "----- Copying files -----"
+    cp php-fpm/config/downstream.php glpi/inc/
+    cp -r glpi nginx/glpi
+    cp -r glpi php-fpm/glpi
+    echo "Copy files done."
+}
+
+cleanup_glpi() {
+    echo "----- Cleaning up files -----"
+    rm -rf glpi
+    rm -rf nginx/glpi
+    rm -rf php-fpm/glpi
+    echo "Clean up done."
+}
+
 # Function to authenticate Docker to Docker Hub or AWS ECR
 authenticate_docker() {
     local repo_url=$1
@@ -47,13 +120,7 @@ authenticate_docker() {
         fi
     else
         echo "Docker Hub repository detected, authenticating with Docker Hub..."
-        if [ -z "${DOCKER_USERNAME}" ]  [ -z "${DOCKER_PASSWORD}" ]; then
-            echo "Error: DOCKER_USERNAME and DOCKER_PASSWORD environment variables must be set for Docker Hub authentication"
-            exit 1
-        else
-            # echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
-            docker login
-        fi
+        docker login
     fi
 }
 
@@ -109,7 +176,17 @@ case $1 in
         push_docker_image "nginx" "${ECR_TAG}"
         push_docker_image "php-fpm" "${ECR_TAG}"
     ;;
+
+    'compose')
+        load_env
+        cleanup_glpi
+        download_glpi
+        deploy_glpi
+        docker compose up -d --build
+        cleanup_glpi
 esac
 
+echo ""
 echo "------------------------------"
 echo "Bootstrap execution completed."
+echo "------------------------------"
