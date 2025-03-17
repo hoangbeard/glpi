@@ -1,0 +1,11 @@
+# Ignore directories
+**/.idea
+**/.vscode
+**/.git
+**/old
+**/composer.phar
+
+**/node_modules
+**/vendor
+
+**/public/build

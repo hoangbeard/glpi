@@ -1,0 +1,6 @@
+# Ignore directories
+**/.idea
+**/.vscode
+**/.git
+**/old
+**/composer.phar
