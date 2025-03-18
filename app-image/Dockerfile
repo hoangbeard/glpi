@@ -1,7 +1,4 @@
-# Define an argument for the base image to be used
-ARG BASE_IMAGE=glpi-base:latest
-
-FROM ${BASE_IMAGE} AS base
+FROM glpi-base:latest AS base
 # =======================================
 # Stage 1: Download GLPI source and plugins
 # =======================================
@@ -69,18 +66,21 @@ COPY config/docker-entrypoint.sh /
 # Copy application files from bootstrap
 COPY --from=bootstrap --chown=www-data:www-data --chmod=2775 ${APP_SOURCE_PATH}/glpi/. ${APP_SOURCE_PATH}/
 
-# Copy env file to application
-COPY --chown=www-data:www-data config/appconfig/.env  ${APP_SOURCE_PATH}/
-
 # Run composer install and set correct permissions and remove unnecessary files
 RUN set -eux; \
-    mkdir -p /glpi-data/files /glpi-data/log && \
-    cp -r ${APP_SOURCE_PATH}/files/* /glpi-data/files/ && \
-    chown -R www-data:www-data /glpi-data ${APP_SOURCE_PATH} && \
-    chmod 2775 ${APP_SOURCE_PATH} /glpi-data && \
-    find ${APP_SOURCE_PATH} /glpi-data -type d -exec chmod 2775 {} + && \
-    find ${APP_SOURCE_PATH} /glpi-data -type f -exec chmod 0664 {} + && \
-    chmod +x /docker-entrypoint.sh
+    chmod +x /docker-entrypoint.sh \
+    ; \
+    DIRS_NEED_GRANTED_PERMISSIONS="/glpi-data/files /glpi-data/log /glpi-data/config" \
+    ; \
+    mkdir -p ${DIRS_NEED_GRANTED_PERMISSIONS}; \
+    cp -r ${APP_SOURCE_PATH}/files/* /glpi-data/files/ \
+    ; \
+    chown -R www-data:www-data ${DIRS_NEED_GRANTED_PERMISSIONS}; \
+    chmod 2775 ${DIRS_NEED_GRANTED_PERMISSIONS}; \
+    for dir in ${DIRS_NEED_GRANTED_PERMISSIONS}; do \
+        find ${dir} -type d -exec chmod 2775 {} \; ; \
+        find ${dir} -type f -exec chmod 0664 {} \; ; \
+    done
 
 # Expose port 80 for Nginx
 EXPOSE 80
@@ -95,4 +95,4 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
 
 # Persistent data storage volume and guide ECS to configure volume bind mount points
-VOLUME [ "/var/www/logs" ]
+VOLUME [ "/glpi-data" ]

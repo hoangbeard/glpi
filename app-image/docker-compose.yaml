@@ -1,0 +1,64 @@
+services:
+  glpi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: glpi-app:latest
+    hostname: app
+    container_name: glpi
+    environment:
+      - GLPI_DB_HOST=${GLPI_DB_HOST}
+      - GLPI_DB_PORT=${GLPI_DB_PORT}
+      - GLPI_DB_DATABASE=${GLPI_DB_DATABASE}
+      - GLPI_DB_USER=${GLPI_DB_USER}
+      - GLPI_DB_PASSWORD=${GLPI_DB_PASSWORD}
+      - GLPI_ADMIN_USER=${GLPI_ADMIN_USER}
+    expose:
+      - 80
+    ports:
+      - "80:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - glpi:/glpi-data:rw
+    restart: unless-stopped
+    networks:
+      - glpinet
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: mysql:lts
+    hostname: db
+    container_name: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${GLPI_DB_DATABASE}
+      - MYSQL_USER=${GLPI_DB_USER}
+      - MYSQL_PASSWORD=${GLPI_DB_PASSWORD}
+    expose:
+      - 3306
+    ports:
+      - "6033:3306"
+    volumes:
+      - dbdata:/var/lib/mysql:rw
+      - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql
+    restart: always
+    networks:
+      - glpinet
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  glpinet:
+
+volumes:
+  dbdata:
+  glpi:
