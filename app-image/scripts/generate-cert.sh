@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Directory for certificates
-CERT_DIR="certs"
+# Use CERT_DIR from environment variable if set, otherwise default to "certs" in current directory
+CERT_DIR="${CERT_DIR:-/glpi-data/certs}"
+echo "Using certificates directory: $CERT_DIR"
 CA_DIR="$CERT_DIR/ca"
 DOMAIN_DIR="$CERT_DIR/domain"
 
@@ -17,7 +19,9 @@ DOMAIN_CERT="$DOMAIN_DIR/server.crt"
 # Certificate configuration
 DAYS_VALID=365
 KEY_BITS=4096
-DOMAIN="localhost"
+# Use DOMAIN from environment variable if set, otherwise default to localhost
+DOMAIN="${DOMAIN:-localhost}"
+echo "Generating certificates for domain: $DOMAIN"
 
 # Create directory structure
 mkdir -p "$CA_DIR"

@@ -13,10 +13,15 @@ services:
       - GLPI_DB_USER=${GLPI_DB_USER}
       - GLPI_DB_PASSWORD=${GLPI_DB_PASSWORD}
       - GLPI_ADMIN_USER=${GLPI_ADMIN_USER}
+      - GLPI_HTTPS_MODE=${GLPI_HTTPS_MODE:-self-signed}
+      - GLPI_DOMAIN=${GLPI_DOMAIN:-glpi.localhost}
+      - GLPI_EMAIL=${GLPI_EMAIL:-admin@example.com}
     expose:
       - 80
+      - 443
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       db:
         condition: service_healthy

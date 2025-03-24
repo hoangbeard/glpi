@@ -48,6 +48,16 @@ LABEL maintainer="HoangBeard <hoangbeard@hoangbeard.com>"
 # Switch to root for managed tasks
 USER root
 
+# Install packages needed for HTTPS
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        certbot \
+        python3-certbot-nginx \
+    ; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
+
 RUN set -eux; \
     # Clean default configuration
     rm -rf /etc/nginx/conf.d \
@@ -62,6 +72,7 @@ COPY config/nginx/. /etc/nginx/
 COPY config/php/. /etc/php/${PHP_VERSION}/
 COPY config/supervisor/. /etc/supervisor/
 COPY config/docker-entrypoint.sh /
+COPY scripts/generate-cert.sh /usr/local/bin/
 
 # Copy application files from bootstrap
 COPY --from=bootstrap --chown=www-data:www-data --chmod=2775 ${APP_SOURCE_PATH}/glpi/. ${APP_SOURCE_PATH}/
@@ -70,7 +81,9 @@ COPY --from=bootstrap --chown=www-data:www-data --chmod=2775 ${APP_SOURCE_PATH}/
 RUN set -eux; \
     chmod +x /docker-entrypoint.sh \
     ; \
-    DIRS_NEED_GRANTED_PERMISSIONS="/glpi-data/files /glpi-data/log /glpi-data/config" \
+    chmod +x /usr/local/bin/generate-cert.sh \
+    ; \
+    DIRS_NEED_GRANTED_PERMISSIONS="/glpi-data/files /glpi-data/log /glpi-data/config /glpi-data/certs" \
     ; \
     mkdir -p ${DIRS_NEED_GRANTED_PERMISSIONS}; \
     cp -r ${APP_SOURCE_PATH}/files/* /glpi-data/files/ \
@@ -82,8 +95,8 @@ RUN set -eux; \
         find ${dir} -type f -exec chmod 0664 {} \; ; \
     done
 
-# Expose port 80 for Nginx
-EXPOSE 80
+# Expose ports for Nginx (HTTP and HTTPS)
+EXPOSE 80 443
 
 # Switch to the www-data user
 USER www-data

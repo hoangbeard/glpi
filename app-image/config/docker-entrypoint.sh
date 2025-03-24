@@ -2,6 +2,11 @@
 
 set -e
 
+# Set default values for environment variables if not provided
+GLPI_HTTPS_MODE=${GLPI_HTTPS_MODE:-self-signed}
+GLPI_DOMAIN=${GLPI_DOMAIN:-localhost}
+GLPI_EMAIL=${GLPI_EMAIL:-admin@example.com}
+
 # Check system information
 echo "{\
 \"os\":\"$(cat /etc/os-release | grep PRETTY_NAME | cut -d '=' -f 2 | tr -d '"')\", \
@@ -20,8 +25,73 @@ echo "{\
 \"composer_version\":\"$(composer -V 2>&1 | head -1 | awk '{print $3}') \
 \"}"
 
+# Verify certificates exist before starting Nginx
+echo "Verifying SSL certificates"
+if [ ! -f "/glpi-data/certs/domain/server.crt" ] || [ ! -f "/glpi-data/certs/domain/server.key" ]; then
+    echo "SSL certificates not found at /glpi-data/certs/domain/"
+    
+    if [ "$GLPI_HTTPS_MODE" = "self-signed" ]; then
+        echo "Generating self-signed certificates for domain: ${GLPI_DOMAIN}"
+
+        export CERT_DIR="/glpi-data/certs"
+        export DOMAIN="${GLPI_DOMAIN}"
+
+        mkdir -p ${CERT_DIR}/domain
+
+        /usr/local/bin/generate-cert.sh
+
+        echo "Self-signed certificates generated successfully."
+    
+    elif [ "$GLPI_HTTPS_MODE" = "letsencrypt" ]; then
+        echo "Setting up Let's Encrypt certificates for domain: ${GLPI_DOMAIN}"
+
+        if [ -f "/etc/letsencrypt/live/${GLPI_DOMAIN}/fullchain.pem" ] && [ -f "/etc/letsencrypt/live/${GLPI_DOMAIN}/privkey.pem" ]; then
+            echo "Let's Encrypt certificates already exist."
+        else
+            echo "Obtaining Let's Encrypt certificates..."
+            
+            # Create webroot directory for ACME challenge
+            mkdir -p ${APP_SOURCE_PATH}/public/.well-known/acme-challenge
+            
+            # Obtain certificates using certbot
+            certbot certonly --webroot \
+                --webroot-path=${APP_SOURCE_PATH}/public \
+                --email=${GLPI_EMAIL} \
+                --agree-tos \
+                --no-eff-email \
+                --domain=${GLPI_DOMAIN}
+                
+            echo "Let's Encrypt certificates obtained successfully."
+        fi
+        
+        # Create symbolic links to Let's Encrypt certificates
+        mkdir -p /glpi-data/certs/domain
+        ln -sf /etc/letsencrypt/live/${GLPI_DOMAIN}/fullchain.pem /glpi-data/certs/domain/server.crt
+        ln -sf /etc/letsencrypt/live/${GLPI_DOMAIN}/privkey.pem /glpi-data/certs/domain/server.key
+        
+        # Set up automatic renewal
+        # echo "0 0,12 * * * root certbot renew --quiet" > /etc/cron.d/certbot-renew
+        
+        echo "Let's Encrypt certificates setup completed."
+    else
+        echo "Invalid HTTPS mode: ${GLPI_HTTPS_MODE}. Using self-signed certificates as fallback."
+
+        export CERT_DIR="/glpi-data/certs"
+        export DOMAIN="${GLPI_DOMAIN}"
+
+        mkdir -p ${CERT_DIR}/domain
+
+        /usr/local/bin/generate-cert.sh
+        
+        echo "Self-signed certificates generated successfully."
+    fi
+else
+    echo "SSL certificates found at /glpi-data/certs/domain/"
+    ls -la /glpi-data/certs/domain/
+fi
+
 # Wait for MySQL to be ready
-echo "----- Checking database connection -----"
+echo "Checking database connection"
 max_retries=30
 counter=0
 while [ $counter -lt $max_retries ]; do
@@ -50,15 +120,14 @@ while [ $counter -lt $max_retries ]; do
 done
 
 # Setting GLPI configuration
-echo "----- Checking system requirements -----"
-php bin/console glpi:system:check_requirements --no-interaction -v
-echo "Check system requirements done."
+echo "Checking system requirements"
+php bin/console glpi:system:check_requirements --no-interaction --quiet
 
 # Check if GLPI is already installed
 if [ ! -f /glpi-data/config/config_db.php ]; then
     # GLPI is not installed, run installation
-    echo "----- Installing GLPI database -----"
-    php bin/console db:install -v \
+    echo "Installing GLPI database"
+    php bin/console db:install --quiet \
     --db-host="${GLPI_DB_HOST}" \
     --db-port="${GLPI_DB_PORT}" \
     --db-name="${GLPI_DB_DATABASE}" \
@@ -67,21 +136,17 @@ if [ ! -f /glpi-data/config/config_db.php ]; then
     --no-interaction \
     --force
     
-    echo "Install GLPI database done."
-    
     # Check database schema integrity
-    echo "----- Checking database schema integrity -----"
-    php bin/console db:check_schema_integrity --no-interaction -v
-    echo "Check database schema integrity done."
+    echo "Checking database schema integrity"
+    php bin/console db:check_schema_integrity --no-interaction --quiet
     
     # Access to timezone database
-    echo "----- Enabling timezones support -----"
-    php bin/console db:enable_timezones --no-interaction -v
-    echo "Enable timezones support done."
+    echo "Enabling timezones support"
+    php bin/console db:enable_timezones --no-interaction --quiet
 else
     # Reconfigure GLPI database configuration
-    echo "----- GLPI is already installed. Re-configuring database configuration -----"
-    php bin/console db:configure -v \
+    echo "GLPI is already installed. Re-configuring database configuration"
+    php bin/console db:configure --quiet \
     --db-host="${GLPI_DB_HOST}" \
     --db-port="${GLPI_DB_PORT}" \
     --db-name="${GLPI_DB_DATABASE}" \
@@ -89,39 +154,33 @@ else
     --db-password="${GLPI_DB_PASSWORD}" \
     --no-interaction \
     --reconfigure
-    
-    echo "GLPI database configuration done."
 
     # Update DB
-    echo "----- Updating database -----"
-    php bin/console db:update -v
-    echo "Update database done."
+    echo "Updating database"
+    php bin/console db:update --quiet
 
     # Check database schema integrity
-    echo "----- Checking database schema integrity -----"
-    php bin/console db:check_schema_integrity --no-interaction -v
-    echo "Check database schema integrity done."
+    echo "Checking database schema integrity"
+    php bin/console db:check_schema_integrity --no-interaction --quiet
 fi
 
 # Plugins installation
-echo "----- Installing GLPI plugins -----"
+echo "Installing GLPI plugins"
 php bin/console glpi:plugin:install --all --username="${GLPI_ADMIN_USER}" --force
 php bin/console glpi:plugin:activate --all
-echo "Install GLPI plugins done."
 
 # Remove install/ directory
-echo "----- Removing Install directory -----"
+echo "Removing Install directory"
 if [ -e ${APP_SOURCE_PATH}/install ]; then
     rm -rf ${APP_SOURCE_PATH}/install
-    echo "Remove Install directory done."
-else
-    echo "Install directory does not exist. Skipping removal."
 fi
 
 # System status
-echo "----- Checking GLPI system status -----"
+echo "Checking GLPI system status"
 php bin/console config:set --version
 php bin/console glpi:system:status --format=json
-echo "Check GLPI system status done."
 
+echo "GLPI is ready to start"
+
+# Start supervisord
 exec "$@"
