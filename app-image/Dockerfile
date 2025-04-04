@@ -53,6 +53,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         certbot \
+        cron \
         python3-certbot-nginx \
     ; \
     apt-get clean; \
@@ -68,6 +69,7 @@ RUN set -eux; \
 WORKDIR ${APP_SOURCE_PATH}
 
 # Copy the nginx, php, supervisor, and appconfig config files to the appropriate directories
+COPY config/cron.d/. /etc/cron.d/
 COPY config/nginx/. /etc/nginx/
 COPY config/php/. /etc/php/${PHP_VERSION}/
 COPY config/supervisor/. /etc/supervisor/
@@ -79,12 +81,13 @@ COPY --from=bootstrap --chown=www-data:www-data --chmod=2775 ${APP_SOURCE_PATH}/
 
 # Run composer install and set correct permissions and remove unnecessary files
 RUN set -eux; \
-    chmod +x /docker-entrypoint.sh \
+    chmod +x /docker-entrypoint.sh; \
+    chmod +x /usr/local/bin/generate-cert.sh; \
+    chmod 0644 /etc/cron.d/*; \
+    find /etc/cron.d/ -type f -iname "*" -exec sed -i "s|\${APP_SOURCE_PATH}|${APP_SOURCE_PATH}|g" {} \;; \
+    chmod u+s /usr/sbin/cron \
     ; \
-    chmod +x /usr/local/bin/generate-cert.sh \
-    ; \
-    DIRS_NEED_GRANTED_PERMISSIONS="/glpi-data/files /glpi-data/log /glpi-data/config /glpi-data/certs" \
-    ; \
+    DIRS_NEED_GRANTED_PERMISSIONS="/glpi-data/files /glpi-data/log /glpi-data/config /glpi-data/certs"; \
     mkdir -p ${DIRS_NEED_GRANTED_PERMISSIONS}; \
     cp -r ${APP_SOURCE_PATH}/files/* /glpi-data/files/ \
     ; \

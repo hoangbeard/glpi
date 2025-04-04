@@ -182,5 +182,17 @@ php bin/console glpi:system:status --format=json
 
 echo "GLPI is ready to start"
 
+# ========== Start cron service ==========
+
+# Load crontab files
+if ! cat /etc/cron.d/* | crontab -; then
+    echo "Error: Failed to load crontab files"
+    exit 1
+fi
+
+echo "Successfully configured cron jobs"
+
+# ========== End of cron service ==========
+
 # Start supervisord
 exec "$@"
